@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kenitra Pharmacy Site Finder</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <div>
+        <div class="eyebrow">Officine · Kenitra, Morocco</div>
+        <h1>Pharmacy Site Finder</h1>
+      </div>
+      <select id="citySelect" aria-label="City">
+        <option value="kenitra">Kenitra</option>
+        <option value="tangier">Tangier</option>
+      </select>
+    </div>
+    <div class="stats" role="status" aria-live="polite">
+      <div><b id="statTotal">0</b><span>pharmacies mapped</span></div>
+      <div><b id="statAdded">0</b><span>added by you</span></div>
+      <div><b id="statCandidates">0</b><span>candidate sites</span></div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-scroll">
+
+        <section class="section">
+          <h2><span class="num">1</span> Exclusion radius</h2>
+          <p class="desc">Every pharmacy on the map gets a circle. Your new pharmacy should sit outside all of them.</p>
+          <div class="radius-input">
+            <label for="radiusInput">Radius</label>
+            <input type="number" id="radiusInput" value="300" min="50" max="2000" step="10">
+            <label for="radiusInput">meters</label>
+          </div>
+          <button class="btn secondary" id="redrawBtn" type="button">Redraw circles</button>
+        </section>
+
+        <section class="section">
+          <h2><span class="num">2</span> Add a pharmacy</h2>
+          <p class="desc">Turn this on, then tap the map where the pharmacy is. We'll try to auto-fill the name from OpenStreetMap.</p>
+          <button class="btn violet" id="addModeBtn" type="button">+ Add pharmacy on map</button>
+        </section>
+
+        <section class="section">
+          <h2>Add by Google Maps link</h2>
+          <p class="desc">Paste a Google Maps link (or just "lat, lng") and a name. Added straight to the map.</p>
+          <label class="sr-only" for="linkInput">Google Maps link or coordinates</label>
+          <input type="text" id="linkInput" class="text-input" placeholder="Google Maps link or 'lat, lng'" />
+          <label class="sr-only" for="linkNameInput">Pharmacy name</label>
+          <input type="text" id="linkNameInput" class="text-input" placeholder="Pharmacy name" />
+          <button class="btn violet" id="addFromLinkBtn" type="button">Add to map</button>
+          <p class="lookup-status" id="linkStatus" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="section">
+          <h2><span class="num">3</span> Find candidate sites</h2>
+          <p class="desc">Scans the city for spots that clear the exclusion radius of every pharmacy, then ranks them by how many real buildings surround them (measured live from OpenStreetMap).</p>
+          <button class="btn" id="findBtn" type="button">Find valid locations</button>
+          <div id="candidateList" class="candidate-list"></div>
+        </section>
+
+        <section class="section">
+          <h2>Data sources</h2>
+          <p class="desc">Merge pharmacies from OpenStreetMap for the selected city, or restore the built-in list (Kenitra only).</p>
+          <button class="btn secondary" id="fetchOsmBtn" type="button">Merge pharmacies from OpenStreetMap</button>          
+          <button class="btn secondary" id="restoreSeedBtn" type="button" style="margin-top:8px;">Restore built-in list</button>
+          <p class="lookup-status" id="osmStatus" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="section">
+          <h2>Your data</h2>
+          <p class="desc">Everything you add or delete is saved in this browser, on this device. Export a JSON file to move it elsewhere or share with a friend.</p>
+          <div class="sync-row"><span class="sync-dot" id="syncDot" aria-hidden="true"></span><span id="syncText">Loading…</span></div>
+          <div class="btn-row">
+            <button class="btn secondary" id="exportBtn" type="button">Export JSON</button>
+            <button class="btn secondary" id="importBtn" type="button">Import JSON</button>
+          </div>
+          <input type="file" id="importFile" accept="application/json" class="sr-only" />
+          <button class="btn danger-outline" id="resetBtn" type="button" style="margin-top:8px;width:auto;">Reset everything</button>
+        </section>
+
+        <section class="section">
+          <h2>Legend</h2>
+          <div class="legend-row"><span class="swatch swatch-existing" aria-hidden="true"></span> Existing pharmacy + radius</div>
+          <div class="legend-row"><span class="swatch swatch-added" aria-hidden="true"></span> Pharmacy you added</div>
+          <div class="legend-row"><span class="swatch swatch-candidate" aria-hidden="true"></span> Candidate site</div>
+        </section>
+
+        <section class="section">
+          <h2>Pharmacies (<span id="listCount">0</span>)</h2>
+          <div class="list" id="pharmList"></div>
+        </section>
+
+      </div>
+      <footer class="footer-note">
+        Pharmacy locations come from OpenStreetMap and public listings; they may be incomplete or outdated — verify before relying on them. Candidate points are straight-line (radius) calculations only; they don't account for water, terrain, roads, or Moroccan pharmacy-licensing rules. Building counts come from OSM and reflect mapped buildings, not census density. Always confirm the actual applicable distance rule with the relevant Ordre des Pharmaciens / delegation before committing to a site.
+      </footer>
+    </aside>
+
+    <main class="mapwrap">
+      <div id="map"></div>
+    </main>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <h3 id="modalTitle">Name this pharmacy</h3>
+    <p id="modalCoords">lat, lng</p>
+    <p class="lookup-status" id="modalLookupStatus" role="status" aria-live="polite">Looking up name…</p>
+    <label class="sr-only" for="modalNameInput">Pharmacy name</label>
+    <input type="text" id="modalNameInput" placeholder="e.g. Pharmacie Al Wafa" />
+    <div class="row">
+      <button class="btn secondary" id="modalCancel" type="button">Cancel</button>
+      <button class="btn violet" id="modalConfirm" type="button">Add pin</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
